@@ -140,6 +140,8 @@ pipeline {
         }
       }
       when {
+        // Evaluate before starting the container, so feature/PR builds do not start one just to skip it.
+        beforeAgent true
         allOf {
           branch 'main'
           not { changeRequest() }
