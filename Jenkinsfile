@@ -140,6 +140,8 @@ pipeline {
         }
       }
       when {
+        // Evaluate before starting the container, so feature/PR builds do not start one just to skip it.
+        beforeAgent true
         allOf {
           branch 'main'
           not { changeRequest() }
@@ -198,6 +200,13 @@ pipeline {
               '''
             }
           }
+          // Only this stage produces Release test results, so a REJECT build publishes no empty
+          // report; here a missing JUnit file is an error, not an empty result.
+          post {
+            always {
+              junit testResults: 'release-evidence/sit-smoke/junit.xml', allowEmptyResults: false
+            }
+          }
         }
 
         // Evidence only: no second smoke run and no UAT endpoint.
@@ -222,7 +231,6 @@ pipeline {
 
       post {
         always {
-          junit testResults: 'release-evidence/sit-smoke/junit.xml', allowEmptyResults: true
           archiveArtifacts artifacts: 'release-evidence/**', allowEmptyArchive: true
         }
       }
