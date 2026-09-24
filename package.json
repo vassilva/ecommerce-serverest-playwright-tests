@@ -1,0 +1,21 @@
+{
+  "name": "automacao-serverest-playwright",
+  "version": "1.0.0",
+  "private": true,
+  "description": "QA automation laboratory for ServeRest using Playwright and TypeScript",
+  "scripts": {
+    "test": "playwright test",
+    "test:chromium": "playwright test --project=chromium",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "typecheck": "tsc --noEmit",
+    "report": "playwright show-report"
+  },
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^24.13.6",
+    "typescript": "^7.0.2"
+  }
+}
