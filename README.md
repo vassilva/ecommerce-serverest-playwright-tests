@@ -107,6 +107,8 @@ support/
   seeder.ts               API setup helpers (user, admin session, product)
   network.ts              Matches the front-end's calls to the ServeRest API
   redaction.ts            Compares users without printing their (fake) passwords
+ci/release.mts            Simulated release steps used by the Jenkins main pipeline
+Jenkinsfile               Jenkins Declarative pipeline
 test-data/builders.ts     Unique fake users and products
 pages/                    Lean Page Objects (locators + actions, no business assertions)
 tests/api/                API specs  -> Playwright project "api"
@@ -164,6 +166,47 @@ reserved for documentation (RFC 2606). Passwords are random fake test values.
 - `trace: 'retain-on-failure'` and `screenshot: 'only-on-failure'`: evidence is kept only
   for failed tests, in `test-results/`.
 - Retries: 0 locally, 2 when `CI` is set (Playwright's generated default).
+- JUnit XML (`reports/junit.xml`) is added only when `CI` is set, so Jenkins can publish
+  native test results. `PLAYWRIGHT_JUNIT_OUTPUT_FILE` redirects it.
+
+## CI/CD (Jenkins)
+
+Jenkins is the intended CI system; there are deliberately no GitHub Actions workflows.
+The pipeline is defined in [`Jenkinsfile`](Jenkinsfile) (Declarative, no Script Approval
+needed). It runs in the official image `mcr.microsoft.com/playwright:v1.63.0-noble`,
+pinned by digest, and sets `CI=true`.
+
+| Trigger        | Stages                                                            |
+| -------------- | ----------------------------------------------------------------- |
+| Feature branch | Install → Quality → Smoke                                         |
+| Pull request   | Install → Quality → Regression (smoke is a subset, not re-run)    |
+| `main`         | Install → Quality → Main Sanity → Manual Deployment Authorization |
+
+After a passing Main Sanity, a human chooses **APPROVE** or **REJECT** (24-hour timeout).
+No executor or container is held while waiting.
+
+- **APPROVE:** Prepare Release (a `git archive` of the built commit) → Release Manifest →
+  Simulated SIT Deployment → SIT Smoke (runs once, against the public ServeRest target) →
+  Simulated UAT Promotion (evidence only, no second test run) → Release Evidence.
+- **REJECT:** no SIT/UAT steps. Release Evidence records `releaseValidated=false`, and the
+  build result is still SUCCESS, because the tests passed.
+- **Timeout or external abort:** Jenkins' native interruption, and the build is ABORTED.
+  It is never treated as a rejection, and no release evidence is written.
+
+**Everything after authorization is a simulation.** No SIT, UAT or production environment
+exists, nothing is deployed, and every evidence file says `deploymentMode: simulated` and
+`realDeploymentPerformed: false`. The release logic lives in
+[`ci/release.mts`](ci/release.mts): TypeScript run directly by Node 24, linted and
+type-checked like the tests. Each record carries the build number and commit, and records
+from any other build are ignored. `releaseValidated` is `true` only when Main Sanity passed,
+deployment was approved, the simulated SIT deployment belongs to this build and commit,
+SIT Smoke passed and the simulated UAT promotion was recorded.
+
+Jenkins archives `playwright-report/`, `test-results/`, `reports/` and `release-evidence/`,
+and publishes the JUnit results.
+
+The lab Jenkins is local-only (loopback), so GitHub webhooks cannot reach it; branches and
+pull requests are discovered by periodic Multibranch scans.
 
 ## Security posture
 
@@ -180,10 +223,9 @@ reserved for documentation (RFC 2606). Passwords are random fake test values.
 
 ## Current limitations
 
-- **CI/CD is not implemented yet.** A Jenkins pipeline is planned for a later phase
-  (feature branch → smoke → PR → regression → merge → `main` → sanity → manual approval →
-  simulated SIT deployment → SIT smoke → simulated UAT promotion → release evidence). SIT
-  and UAT will be simulated; they are not real environments.
+- **CI/CD runs on a local lab Jenkins only.** The Jenkinsfile and release logic are in this
+  repository, but no public CI service is attached. SIT and UAT are simulated; they are not
+  real environments, and no production environment is claimed.
 - Tests depend on the availability and shared state of the public ServeRest services.
 - Only Chromium is configured.
 - TypeScript is held at 6.0 until type-aware linting supports TypeScript 7.

@@ -9,6 +9,6 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["**/*.ts"],
-  "exclude": ["node_modules", "playwright-report", "test-results"]
+  "include": ["**/*.ts", "**/*.mts"],
+  "exclude": ["node_modules", "playwright-report", "test-results", "reports", "release-evidence"]
 }

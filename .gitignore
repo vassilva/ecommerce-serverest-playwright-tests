@@ -9,6 +9,10 @@ node_modules/
 /playwright/.auth/
 .auth/
 
+# CI output (JUnit XML, simulated release evidence)
+/reports/
+/release-evidence/
+
 # Local environment / secrets
 .env
 .env.*

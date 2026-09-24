@@ -17,11 +17,19 @@ const playwrightSupportRules = {
 };
 
 export default defineConfig(
-  globalIgnores(['node_modules/', 'playwright-report/', 'test-results/', 'blob-report/', 'playwright/.cache/']),
+  globalIgnores([
+    'node_modules/',
+    'playwright-report/',
+    'test-results/',
+    'blob-report/',
+    'playwright/.cache/',
+    'reports/',
+    'release-evidence/',
+  ]),
 
   {
     name: 'project/typescript',
-    files: ['**/*.ts'],
+    files: ['**/*.ts', '**/*.mts'],
     extends: [js.configs.recommended, tseslint.configs.recommendedTypeChecked],
     languageOptions: {
       parserOptions: {
