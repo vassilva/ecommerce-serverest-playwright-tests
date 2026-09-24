@@ -5,9 +5,15 @@
   "description": "QA automation laboratory for ServeRest using Playwright and TypeScript",
   "scripts": {
     "test": "playwright test",
+    "test:api": "playwright test --grep @api",
+    "test:ui": "playwright test --grep @ui",
+    "test:smoke": "playwright test --grep @smoke",
+    "test:regression": "playwright test --grep @regression",
+    "test:negative": "playwright test --grep @negative",
+    "test:sanity": "playwright test --grep @sanity",
     "test:chromium": "playwright test --project=chromium",
-    "test:headed": "playwright test --headed",
-    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --project=chromium --headed",
+    "test:ui-mode": "playwright test --ui",
     "typecheck": "tsc --noEmit",
     "report": "playwright show-report"
   },
