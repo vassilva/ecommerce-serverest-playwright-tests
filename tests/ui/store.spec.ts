@@ -37,25 +37,29 @@ test.describe('Store UI', { tag: '@ui' }, () => {
     await expect(store.productCards).toHaveCount(0);
   });
 
-  test('adds a searched product to the shopping list and changes its quantity', { tag: '@regression' }, async ({ page, seed }) => {
-    const { token } = await seed.adminSession();
-    // Stock above 1 so the quantity can be increased.
-    const product = await seed.product(token, { quantidade: 10 });
-    const store = new StoreHomePage(page);
-    const shoppingList = new ShoppingListPage(page);
+  test(
+    'adds a searched product to the shopping list and changes its quantity',
+    { tag: '@regression' },
+    async ({ page, seed }) => {
+      const { token } = await seed.adminSession();
+      // Stock above 1 so the quantity can be increased.
+      const product = await seed.product(token, { quantidade: 10 });
+      const store = new StoreHomePage(page);
+      const shoppingList = new ShoppingListPage(page);
 
-    await store.open();
-    await store.search(product.nome);
-    await store.addToList(product.nome);
+      await store.open();
+      await store.search(product.nome);
+      await store.addToList(product.nome);
 
-    await expect(page).toHaveURL(/\/minhaListaDeProdutos$/);
-    await expect(shoppingList.heading).toBeVisible();
-    await expect(shoppingList.productNames).toHaveText([`Produto:${product.nome}`]);
-    await expect(shoppingList.priceText(product.preco)).toBeVisible();
-    await expect(shoppingList.productQuantities).toHaveText(['Total: 1']);
+      await expect(page).toHaveURL(/\/minhaListaDeProdutos$/);
+      await expect(shoppingList.heading).toBeVisible();
+      await expect(shoppingList.productNames).toHaveText([`Produto:${product.nome}`]);
+      await expect(shoppingList.priceText(product.preco)).toBeVisible();
+      await expect(shoppingList.productQuantities).toHaveText(['Total: 1']);
 
-    await shoppingList.increaseQuantityButtons.click();
+      await shoppingList.increaseQuantityButtons.click();
 
-    await expect(shoppingList.productQuantities).toHaveText(['Total: 2']);
-  });
+      await expect(shoppingList.productQuantities).toHaveText(['Total: 2']);
+    },
+  );
 });

@@ -1,0 +1,9 @@
+# Dependencies and npm-managed files
+node_modules/
+package-lock.json
+
+# Playwright runtime output
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/

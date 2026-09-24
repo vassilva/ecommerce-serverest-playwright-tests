@@ -3,17 +3,24 @@ import { expect, test } from '../../fixtures/test';
 import { buildUser } from '../../test-data/builders';
 
 test.describe('Login API', { tag: '@api' }, () => {
-  test('logs in a registered user and returns a bearer token', { tag: ['@smoke', '@regression', '@sanity'] }, async ({ authApi, seed }) => {
-    const user = await seed.user();
+  test(
+    'logs in a registered user and returns a bearer token',
+    { tag: ['@smoke', '@regression', '@sanity'] },
+    async ({ authApi, seed }) => {
+      const user = await seed.user();
 
-    const response = await authApi.login({ email: user.email, password: user.password });
+      const response = await authApi.login({ email: user.email, password: user.password });
 
-    expect(response.status()).toBe(200);
-    const body = (await response.json()) as LoginResponse;
-    expect(body.message).toBe('Login realizado com sucesso');
-    // Boolean checks keep the token value out of failure output.
-    expect(typeof body.authorization === 'string' && body.authorization.startsWith('Bearer '), 'authorization is a Bearer token').toBe(true);
-  });
+      expect(response.status()).toBe(200);
+      const body = (await response.json()) as LoginResponse;
+      expect(body.message).toBe('Login realizado com sucesso');
+      // Boolean checks keep the token value out of failure output.
+      expect(
+        typeof body.authorization === 'string' && body.authorization.startsWith('Bearer '),
+        'authorization is a Bearer token',
+      ).toBe(true);
+    },
+  );
 
   test('rejects a wrong password', { tag: ['@regression', '@negative'] }, async ({ authApi, seed }) => {
     const user = await seed.user();

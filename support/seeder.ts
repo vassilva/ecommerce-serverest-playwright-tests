@@ -2,7 +2,15 @@ import { expect } from '@playwright/test';
 import type { AuthClient } from '../api/auth-client';
 import type { ProductsClient } from '../api/products-client';
 import type { UsersClient } from '../api/users-client';
-import type { Credentials, CreatedResponse, LoginResponse, Product, ProductPayload, User, UserPayload } from '../api/types';
+import type {
+  Credentials,
+  CreatedResponse,
+  LoginResponse,
+  Product,
+  ProductPayload,
+  User,
+  UserPayload,
+} from '../api/types';
 import { buildProduct, buildUser } from '../test-data/builders';
 import type { ResourceTracker } from './resource-tracker';
 
@@ -27,9 +35,9 @@ export class Seeder {
   async user(overrides: Partial<UserPayload> = {}): Promise<User> {
     const payload = buildUser(overrides);
     const response = await this.users.create(payload);
-    expect(response.status(), 'seed: POST /usuarios should return 201').toBe(201);
     const body = (await response.json()) as CreatedResponse;
-    this.tracker.user(body._id);
+    this.tracker.userFromCreation(body);
+    expect(response.status(), 'seed: POST /usuarios should return 201').toBe(201);
     return { ...payload, _id: body._id };
   }
 
@@ -47,9 +55,9 @@ export class Seeder {
   async product(adminToken: string, overrides: Partial<ProductPayload> = {}): Promise<Product> {
     const payload = buildProduct(overrides);
     const response = await this.products.create(payload, adminToken);
-    expect(response.status(), 'seed: POST /produtos should return 201').toBe(201);
     const body = (await response.json()) as CreatedResponse;
-    this.tracker.product(body._id, adminToken);
+    this.tracker.productFromCreation(body, adminToken);
+    expect(response.status(), 'seed: POST /produtos should return 201').toBe(201);
     return { ...payload, _id: body._id };
   }
 }

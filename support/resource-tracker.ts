@@ -38,6 +38,20 @@ export class ResourceTracker {
     });
   }
 
+  /**
+   * Registers a user from a creation response body before the test asserts on it,
+   * so an unexpected status that still created the user cannot leak it.
+   */
+  userFromCreation(body: unknown): void {
+    const id = createdId(body);
+    if (id) this.user(id);
+  }
+
+  productFromCreation(body: unknown, adminToken: string): void {
+    const id = createdId(body);
+    if (id) this.product(id, adminToken);
+  }
+
   /** Runs every task even if some fail, and returns the failures instead of throwing. */
   async cleanup(): Promise<string[]> {
     const failures: string[] = [];
@@ -50,6 +64,11 @@ export class ResourceTracker {
     }
     return failures;
   }
+}
+
+function createdId(body: unknown): string | undefined {
+  if (typeof body !== 'object' || body === null || !('_id' in body)) return undefined;
+  return typeof body._id === 'string' && body._id.length > 0 ? body._id : undefined;
 }
 
 async function verifyDeleted(label: string, response: APIResponse): Promise<void> {
