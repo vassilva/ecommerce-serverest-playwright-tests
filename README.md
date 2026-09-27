@@ -137,6 +137,9 @@ Tags use Playwright's native `tag` option and are selected with `--grep`.
 
 A test only carries the tags that describe it; overlap between tags is expected.
 
+For the workflow used to design, tag, review and merge new automated tests, see
+[`docs/automation-workflow.md`](docs/automation-workflow.md).
+
 ## Test data
 
 [`test-data/builders.ts`](test-data/builders.ts) creates unique values from a timestamp
