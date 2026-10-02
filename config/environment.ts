@@ -3,6 +3,7 @@
  *
  * Values come from environment variables with safe public defaults, so no
  * .env file is required. Only origins are accepted (no path, no credentials).
+ * ci/target-check.mts mirrors these defaults; keep the two in sync.
  */
 
 function readOrigin(variableName: string, fallback: string): string {

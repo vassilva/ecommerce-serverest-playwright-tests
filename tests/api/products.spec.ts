@@ -20,7 +20,7 @@ async function expectNoProductNamed(productsApi: ProductsClient, nome: string): 
 
 test.describe('Products API', { tag: '@api' }, () => {
   test(
-    'allows an administrator to create a product',
+    'allows an administrator to create a product that can be retrieved by id',
     { tag: ['@smoke', '@regression'] },
     async ({ productsApi, seed, cleanup }) => {
       const { token } = await seed.adminSession();
@@ -32,18 +32,12 @@ test.describe('Products API', { tag: '@api' }, () => {
 
       expect(response.status()).toBe(201);
       expect(body).toEqual({ message: 'Cadastro realizado com sucesso', _id: expect.stringMatching(SERVEREST_ID) });
+
+      const lookup = await productsApi.getById(body._id);
+      expect(lookup.status()).toBe(200);
+      expect((await lookup.json()) as Product).toEqual({ ...product, _id: body._id });
     },
   );
-
-  test('retrieves a created product by id', { tag: '@regression' }, async ({ productsApi, seed }) => {
-    const { token } = await seed.adminSession();
-    const product = await seed.product(token);
-
-    const response = await productsApi.getById(product._id);
-
-    expect(response.status()).toBe(200);
-    expect((await response.json()) as Product).toEqual(product);
-  });
 
   test('finds a created product by exact name', { tag: ['@regression', '@sanity'] }, async ({ productsApi, seed }) => {
     const { token } = await seed.adminSession();

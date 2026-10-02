@@ -1,8 +1,8 @@
 // Jenkins CI/CD for the ServeRest Playwright + TypeScript laboratory.
 //
-//   Feature branch : Install -> Quality -> Smoke
-//   Pull request   : Install -> Quality -> Regression (smoke is a subset, not run separately)
-//   main           : Install -> Quality -> Main Sanity -> Manual Deployment Authorization
+//   Feature branch : Install -> Quality -> Target Check -> Smoke
+//   Pull request   : Install -> Quality -> Target Check -> Regression (smoke is a subset, not run separately)
+//   main           : Install -> Quality -> Target Check -> Main Sanity -> Manual Deployment Authorization
 //                    APPROVE -> Prepare Release -> Release Manifest -> Simulated SIT Deployment
 //                               -> SIT Smoke (once) -> Simulated UAT Promotion -> Release Evidence
 //                    REJECT  -> Release Evidence (releaseValidated=false, build SUCCESS)
@@ -51,6 +51,15 @@ pipeline {
         stage('Quality') {
           steps {
             sh 'npm run quality'
+          }
+        }
+
+        // One read-only GET per public ServeRest origin. A failure here means the external
+        // target is unavailable (not an automation failure), and no tests are started.
+        // It proves reachability only, never application correctness.
+        stage('Target Check') {
+          steps {
+            sh 'node ci/target-check.mts'
           }
         }
 

@@ -107,6 +107,7 @@ support/
   seeder.ts               API setup helpers (user, admin session, product)
   network.ts              Matches the front-end's calls to the ServeRest API
   redaction.ts            Compares users without printing their (fake) passwords
+ci/target-check.mts       Jenkins Target Check: is the public ServeRest target reachable?
 ci/release.mts            Simulated release steps used by the Jenkins main pipeline
 Jenkinsfile               Jenkins Declarative pipeline
 test-data/builders.ts     Unique fake users and products
@@ -169,6 +170,9 @@ reserved for documentation (RFC 2606). Passwords are random fake test values.
 - `trace: 'retain-on-failure'` and `screenshot: 'only-on-failure'`: evidence is kept only
   for failed tests, in `test-results/`.
 - Retries: 0 locally, 2 when `CI` is set (Playwright's generated default).
+- Workers: Playwright's default locally, 2 when `CI` is set. Two workers were validated
+  against the public ServeRest services with repeated full regression runs (no failures,
+  retries, rate limiting or cleanup errors). Every test owns its data, so tests can run in parallel.
 - JUnit XML (`reports/junit.xml`) is added only when `CI` is set, so Jenkins can publish
   native test results. `PLAYWRIGHT_JUNIT_OUTPUT_FILE` redirects it.
 
@@ -179,11 +183,26 @@ The pipeline is defined in [`Jenkinsfile`](Jenkinsfile) (Declarative, no Script 
 needed). It runs in the official image `mcr.microsoft.com/playwright:v1.63.0-noble`,
 pinned by digest, and sets `CI=true`.
 
-| Trigger        | Stages                                                            |
-| -------------- | ----------------------------------------------------------------- |
-| Feature branch | Install → Quality → Smoke                                         |
-| Pull request   | Install → Quality → Regression (smoke is a subset, not re-run)    |
-| `main`         | Install → Quality → Main Sanity → Manual Deployment Authorization |
+| Trigger        | Stages                                                                           |
+| -------------- | -------------------------------------------------------------------------------- |
+| Feature branch | Install → Quality → Target Check → Smoke                                         |
+| Pull request   | Install → Quality → Target Check → Regression (smoke is a subset, not re-run)    |
+| `main`         | Install → Quality → Target Check → Main Sanity → Manual Deployment Authorization |
+
+**Target Check** ([`ci/target-check.mts`](ci/target-check.mts)) runs before any test. It sends
+one read-only `GET` (10-second timeout, no retries, no credentials) to each configured origin:
+
+- API (`SERVEREST_API_URL`): `GET /produtos?nome=QA PW target-check probe` must return HTTP 200
+  with a ServeRest product-list body (`quantidade` and `produtos`).
+- UI (`SERVEREST_UI_URL`): `GET /` must return HTTP 200 with an HTML content type.
+
+If either check fails, the build stops at this stage with `PUBLIC TARGET UNAVAILABLE`, naming the
+origin and the cause (`DNS`, `TIMEOUT`, `NETWORK` or the unexpected HTTP response). A failure here
+is an environment failure, not an automation or application failure. Passing the check proves only
+that the public target is reachable. It says nothing about whether the application behaves
+correctly, and the target can still fail later in the run. The script's default origins mirror
+[`config/environment.ts`](config/environment.ts), because Node cannot load that file directly;
+keep the two in sync. The check is not part of the simulated release flow.
 
 After a passing Main Sanity, a human chooses **APPROVE** or **REJECT** (24-hour timeout).
 No executor or container is held while waiting.
