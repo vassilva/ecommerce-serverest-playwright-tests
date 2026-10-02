@@ -12,27 +12,26 @@ import { buildUser } from '../../test-data/builders';
 const SERVEREST_ID = /^[A-Za-z0-9]{16}$/;
 
 test.describe('Users API', { tag: '@api' }, () => {
-  test('creates a user with a valid payload', { tag: ['@smoke', '@regression'] }, async ({ usersApi, cleanup }) => {
-    const user = buildUser();
+  test(
+    'creates a user that can be retrieved by id',
+    { tag: ['@smoke', '@regression', '@sanity'] },
+    async ({ usersApi, cleanup }) => {
+      const user = buildUser();
 
-    const response = await usersApi.create(user);
-    const body = (await response.json()) as CreatedResponse;
-    cleanup.userFromCreation(body);
+      const response = await usersApi.create(user);
+      const body = (await response.json()) as CreatedResponse;
+      cleanup.userFromCreation(body);
 
-    expect(response.status()).toBe(201);
-    expect(body).toEqual({ message: 'Cadastro realizado com sucesso', _id: expect.stringMatching(SERVEREST_ID) });
-  });
+      expect(response.status()).toBe(201);
+      expect(body).toEqual({ message: 'Cadastro realizado com sucesso', _id: expect.stringMatching(SERVEREST_ID) });
 
-  test('retrieves a created user by id', { tag: ['@regression', '@sanity'] }, async ({ usersApi, seed }) => {
-    const user = await seed.user();
-
-    const response = await usersApi.getById(user._id);
-
-    expect(response.status()).toBe(200);
-    const body = (await response.json()) as User;
-    expect(withoutPassword(body)).toEqual(withoutPassword(user));
-    expect(body.password === user.password, 'stored password matches the submitted one').toBe(true);
-  });
+      const lookup = await usersApi.getById(body._id);
+      expect(lookup.status()).toBe(200);
+      const stored = (await lookup.json()) as User;
+      expect(withoutPassword(stored)).toEqual(withoutPassword({ ...user, _id: body._id }));
+      expect(stored.password === user.password, 'stored password matches the submitted one').toBe(true);
+    },
+  );
 
   test(
     'rejects a duplicate email and keeps a single user',

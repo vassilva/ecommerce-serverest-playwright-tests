@@ -11,8 +11,11 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
+  /*
+   * 2 workers on CI: validated as stable against the public ServeRest services
+   * (no rate limiting, retries or cleanup failures). Tests are isolated by design.
+   */
+  workers: process.env.CI ? 2 : undefined,
   /*
    * Console progress plus an HTML report that never auto-opens a server.
    * On CI, JUnit XML is added for Jenkins; the pipeline can redirect it per run.

@@ -234,17 +234,23 @@ screenshots that contain them.
 
 ## 12. Jenkins PR validation
 
-For a Pull Request, the [`Jenkinsfile`](../Jenkinsfile) runs **Install → Quality →
+For a Pull Request, the [`Jenkinsfile`](../Jenkinsfile) runs **Install → Quality → Target Check →
 Regression**:
 
 - `npm ci`
 - `npm run quality`
+- `node ci/target-check.mts` (checks that the public ServeRest API and UI are reachable; see the
+  [README CI/CD section](../README.md#cicd-jenkins))
 - `npm run test:regression` (smoke is a subset of regression and is not run separately)
 
-Jenkins sets `CI=true`, so Playwright uses 2 retries and 1 worker, and JUnit results are
+A failed Target Check means the public target was unavailable. It is not a failure of the
+change under review, so re-run the build once the service is back. A passing Target Check
+does not prove that the tests will pass.
+
+Jenkins sets `CI=true`, so Playwright uses 2 retries and 2 workers, and JUnit results are
 published. The lab Jenkins discovers branches and PRs through periodic Multibranch scans,
 not webhooks, so a build can start with a delay. Feature-branch builds (builds that are not a
-change request) run **Install → Quality → Smoke** instead.
+change request) run **Install → Quality → Target Check → Smoke** instead.
 
 Jenkins selects tests by tag, not from a list. A new test with `@regression` joins the PR
 regression run automatically once it is on the branch under test. If the regression pack
@@ -258,7 +264,7 @@ merge.
 
 Merge only after the Human Code Review is approved and the Jenkins PR build passes.
 
-On `main`, the pipeline runs **Install → Quality → Main Sanity** (`npm run test:sanity`),
+On `main`, the pipeline runs **Install → Quality → Target Check → Main Sanity** (`npm run test:sanity`),
 then waits for **Manual Deployment Authorization**. The later release stages are described
 in the [README CI/CD section](../README.md#cicd-jenkins). A new test affects them only
 through its tags:
