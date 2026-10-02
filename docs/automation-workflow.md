@@ -121,11 +121,14 @@ The layer tag is set once on `test.describe`, and the other tags on each `test`.
 | `@regression` | Carried by **every** current test. **This is the tag Jenkins runs on Pull Requests.**                                        | Always, unless there is an explicit, reviewed reason to exclude the test from PR validation. | The test is exploratory or temporarily unreliable (fix it first rather than merging it).                 |
 | `@negative`   | Rejection and validation cases: wrong credentials, missing token, duplicates, blank or invalid fields, empty search results. | The expected outcome is that the system refuses or reports an error/empty result.            | The happy path succeeds.                                                                                 |
 | `@smoke`      | One fast, critical happy path per spec file. Runs on feature-branch builds and in SIT Smoke on `main` after an APPROVE.      | The test is a new critical happy path that is not already represented in `@smoke`.           | Negative cases, secondary paths, or anything that makes smoke slower without adding critical confidence. |
-| `@sanity`     | A minimal subset (login via API and UI, user lookup, product search). Drives the **Main Sanity** gate on `main`.             | The test replaces or fills a gap in that minimal post-merge check.                           | By default. A failing sanity test blocks the release-authorization step on `main`.                       |
 
-Keep `@smoke` and `@sanity` intentionally selective. Importance alone does not qualify a
-test. Most new tests end up as `@regression`, optionally with `@negative`, plus the layer tag
-inherited from their `describe`.
+Keep `@smoke` intentionally selective. Importance alone does not qualify a test. Most new
+tests end up as `@regression`, optionally with `@negative`, plus the layer tag inherited
+from their `describe`.
+
+There is deliberately **no `@sanity` tag**. Sanity is a focused local check chosen for a
+specific correction, not a fixed suite (see [Section 10](#10-local-sanity-validation)). Do not
+add `@sanity`, or any other permanent tag, to mark tests as "important".
 
 Current tag membership can be checked at any time without running tests:
 
@@ -193,7 +196,52 @@ Local validation does not replace Jenkins. Tests run against the public ServeRes
 so a local failure can also be caused by the service being unavailable. Investigate before
 retrying.
 
-## 10. Human Code Review
+## 10. Local Sanity Validation
+
+**Sanity** answers one question for a bug fix or a narrowly scoped correction: _does the
+functionality directly affected by this correction still behave as expected?_
+
+- Sanity is **local, contextual and on demand**. It is run by the developer, for the
+  correction at hand.
+- Sanity is **never** executed by Jenkins. It is not a PR check, not a merge gate, not a
+  release gate, and it is not run automatically on `main`.
+- Sanity is **not a fixed subset** of important tests, and there is no `@sanity` tag or
+  `test:sanity` script. Criticality, Smoke, Regression and Sanity are separate concepts.
+- The **affected functionality** decides the scope: one test, several tests, one spec, or
+  another focused Playwright selection. Never run unrelated tests just because they are
+  important.
+- **Reuse existing automated coverage** whenever it covers the affected behavior. Add or
+  extend a test only when the correction is not covered yet (then follow Sections 4–8).
+- Prefer **native, focused Playwright execution**. There is no separate sanity configuration.
+
+```text
+Bug / correction
+  → Identify the affected functionality
+  → Identify the existing automated coverage for it
+  → Select a focused local validation
+  → Run local Sanity
+  → PASS: continue the normal workflow (Pull Request)
+  → Jenkins PR Regression (the authoritative, broad automated validation)
+```
+
+Examples of focused selections:
+
+```bash
+# A fix in product creation
+npx playwright test tests/api/products.spec.ts -g "create a product"
+
+# A fix in the login error shown to the user
+npx playwright test tests/ui/login.spec.ts -g "rejects invalid credentials"
+
+# Several related behaviors in one area
+npx playwright test tests/api/login.spec.ts tests/ui/login.spec.ts
+```
+
+Record the selection you ran, and its result, under _Local Validation_ in the Pull Request.
+Passing local Sanity does not replace PR Regression. **Regression** remains the PR
+validation suite, and **Smoke** remains the stable subset of critical flows.
+
+## 11. Human Code Review
 
 A human reviews every Pull Request **before merge**. Jenkins only confirms that the code
 builds and the selected tests pass. It does not judge whether the test is the right test.
@@ -202,8 +250,8 @@ builds and the selected tests pass. It does not judge whether the test is the ri
 
 - Should this scenario be automated at all? Is the rationale recorded?
 - Is API or UI the right layer? Does it duplicate existing coverage?
-- Are the tags correct: `@regression` present, `@negative` accurate, `@smoke`/`@sanity`
-  justified if added?
+- Are the tags correct: `@regression` present, `@negative` accurate, `@smoke` justified if
+  added, and no `@sanity` tag?
 - If a Test Case ID is used, is it real and does it match the scenario?
 - Does the test validate meaningful business behavior?
 
@@ -218,7 +266,7 @@ builds and the selected tests pass. It does not judge whether the test is the ri
 - Code is strictly typed and readable, without unnecessary duplication.
 - No credentials, tokens or passwords are hardcoded or printed.
 
-## 11. Pull Request
+## 12. Pull Request
 
 Open the PR with the [pull request template](../.github/pull_request_template.md). It
 asks for:
@@ -232,7 +280,7 @@ asks for:
 Evidence must be non-sensitive. Do not paste tokens, passwords, cookies or reports or
 screenshots that contain them.
 
-## 12. Jenkins PR validation
+## 13. Jenkins PR validation
 
 For a Pull Request, the [`Jenkinsfile`](../Jenkinsfile) runs **Install → Quality → Target Check →
 Regression**:
@@ -260,17 +308,20 @@ executed during PR validation.
 A test that passes only on retry is reported as flaky and should be investigated before
 merge.
 
-## 13. Merge and `main`
+## 14. Merge and `main`
 
 Merge only after the Human Code Review is approved and the Jenkins PR build passes.
 
-On `main`, the pipeline runs **Install → Quality → Target Check → Main Sanity** (`npm run test:sanity`),
-then waits for **Manual Deployment Authorization**. The later release stages are described
-in the [README CI/CD section](../README.md#cicd-jenkins). A new test affects them only
-through its tags:
+GitHub enforces the Jenkins part. The `main` ruleset requires a Pull Request, allows only
+squash merges, and requires the `continuous-integration/jenkins/pr-head` check with the
+branch up to date with `main`. Opening a PR is always possible. Merge stays blocked while
+that check is pending or failing, and becomes available once it succeeds.
 
-- `@sanity` tests run in Main Sanity, and a failure stops the build before authorization;
-- `@smoke` tests run once more in SIT Smoke, after an APPROVE.
+On `main`, the pipeline runs **Install → Quality → Target Check**, then waits for **Manual
+Deployment Authorization**. No test suite runs before authorization: every change already
+passed PR Regression on a branch that was up to date with `main`. The later release stages
+are described in the [README CI/CD section](../README.md#cicd-jenkins). A new test affects
+them only through its tags: `@smoke` tests run once in SIT Smoke, after an APPROVE.
 
 Test execution is real. Deployment and promotion are **simulated**:
 
@@ -281,12 +332,12 @@ Test execution is real. Deployment and promotion are **simulated**:
 - No real deployment is performed. Evidence files state `deploymentMode: simulated` and
   `realDeploymentPerformed: false`.
 
-## 14. Definition of Done for a new automated test
+## 15. Definition of Done for a new automated test
 
 - [ ] Test Case or relevant requirement identified
 - [ ] Automation decision justified (Section 4)
 - [ ] API/UI layer chosen appropriately, without unjustified duplicate coverage
-- [ ] Tags selected: layer tag via `describe`, `@regression`, plus `@negative`/`@smoke`/`@sanity` only when they apply
+- [ ] Tags selected: layer tag via `describe`, `@regression`, plus `@negative`/`@smoke` only when they apply
 - [ ] Real Test Case ID in the title when one exists, and no invented IDs
 - [ ] Existing fixtures, API clients, Page Objects and builders reused
 - [ ] Assertions validate the intended behavior

@@ -107,7 +107,8 @@ function recordAuthorization(): void {
     status,
     submittedBy: process.env.AUTHORIZATION_SUBMITTER || null,
     recordedAt: new Date().toISOString(),
-    meaning: 'A passing Main Sanity gate does not authorize deployment by itself; this is the separate human decision.',
+    meaning:
+      'Passing Quality and Target Check does not authorize deployment by itself; this is the separate human decision.',
   });
 }
 
@@ -208,8 +209,6 @@ function writeReleaseEvidence(): void {
   const sitSmoke = readOwnRecord(FILES.sitSmoke, id);
   const uatPromotion = readOwnRecord(FILES.uatPromotion, id);
 
-  // Main Sanity is fail-hard and runs before authorization, so this stage is only reachable after it passed.
-  const mainSanity = 'passed';
   const authorizationStatus = typeof authorization?.status === 'string' ? authorization.status : 'unknown';
   const sitDeploymentStatus = sitDeployment ? 'performed' : 'not-performed';
   const sitSmokeStatus = typeof sitSmoke?.status === 'string' ? sitSmoke.status : 'not-run';
@@ -223,7 +222,6 @@ function writeReleaseEvidence(): void {
 
   writeJson(FILES.evidence, {
     ...id,
-    mainSanity,
     authorizationStatus,
     authorizationSubmittedBy: authorization?.submittedBy ?? null,
     simulatedSitDeployment: sitDeploymentStatus,
@@ -231,7 +229,7 @@ function writeReleaseEvidence(): void {
     simulatedUatPromotion: uatPromotionStatus,
     releaseValidated,
     releaseValidatedMeaning:
-      'true only when Main Sanity passed, deployment was approved, the simulated SIT deployment belongs to this build and commit, SIT Smoke passed and the simulated UAT promotion was recorded.',
+      'true only when deployment was approved, the simulated SIT deployment belongs to this build and commit, SIT Smoke passed and the simulated UAT promotion was recorded.',
     realDeploymentPerformed: false,
     generatedAt: new Date().toISOString(),
     note: SIMULATION_NOTE,

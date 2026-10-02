@@ -39,7 +39,7 @@ test.describe('Products API', { tag: '@api' }, () => {
     },
   );
 
-  test('finds a created product by exact name', { tag: ['@regression', '@sanity'] }, async ({ productsApi, seed }) => {
+  test('finds a created product by exact name', { tag: '@regression' }, async ({ productsApi, seed }) => {
     const { token } = await seed.adminSession();
     const product = await seed.product(token);
 
