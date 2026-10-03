@@ -85,8 +85,14 @@ pipeline {
 
       post {
         always {
-          junit testResults: 'reports/junit.xml', allowEmptyResults: true
-          archiveArtifacts artifacts: 'playwright-report/**, test-results/**, reports/**', allowEmptyArchive: true
+          script {
+            // Publish only when a Verify test stage was expected to run (Smoke or Regression,
+            // per their `when` conditions). On main, Verify intentionally runs no tests.
+            if (env.CHANGE_ID || env.BRANCH_NAME != 'main') {
+              junit testResults: 'reports/junit.xml', allowEmptyResults: true
+              archiveArtifacts artifacts: 'playwright-report/**, test-results/**, reports/**', allowEmptyArchive: true
+            }
+          }
         }
       }
     }
