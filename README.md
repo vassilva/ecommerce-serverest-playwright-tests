@@ -60,7 +60,6 @@ npx playwright install chromium
 | `npm run test:smoke`      | `@smoke`                              |
 | `npm run test:regression` | `@regression`                         |
 | `npm run test:negative`   | `@negative`                           |
-| `npm run test:sanity`     | `@sanity`                             |
 | `npm run test:chromium`   | The `chromium` (UI) project only      |
 | `npm run test:headed`     | UI project in a visible browser       |
 | `npm run test:ui-mode`    | Playwright's interactive UI mode      |
@@ -134,9 +133,12 @@ Tags use Playwright's native `tag` option and are selected with `--grep`.
 | `@smoke`       | Fast critical happy paths                  | Feature branches    |
 | `@regression`  | The regression pack (currently every test) | Pull requests       |
 | `@negative`    | Rejection/validation behavior              | Subset reporting    |
-| `@sanity`      | Minimal post-merge / post-deployment check | `main`, SIT smoke   |
 
 A test only carries the tags that describe it; overlap between tags is expected.
+
+There is no `@sanity` tag. Sanity is a local, on-demand check of the functionality affected
+by a specific fix, run with a focused Playwright selection and never by Jenkins (see
+[Local Sanity Validation](docs/automation-workflow.md#10-local-sanity-validation)).
 
 For the workflow used to design, tag, review and merge new automated tests, see
 [`docs/automation-workflow.md`](docs/automation-workflow.md).
@@ -183,11 +185,15 @@ The pipeline is defined in [`Jenkinsfile`](Jenkinsfile) (Declarative, no Script 
 needed). It runs in the official image `mcr.microsoft.com/playwright:v1.63.0-noble`,
 pinned by digest, and sets `CI=true`.
 
-| Trigger        | Stages                                                                           |
-| -------------- | -------------------------------------------------------------------------------- |
-| Feature branch | Install → Quality → Target Check → Smoke                                         |
-| Pull request   | Install → Quality → Target Check → Regression (smoke is a subset, not re-run)    |
-| `main`         | Install → Quality → Target Check → Main Sanity → Manual Deployment Authorization |
+| Trigger        | Stages                                                                        |
+| -------------- | ----------------------------------------------------------------------------- |
+| Feature branch | Install → Quality → Target Check → Smoke                                      |
+| Pull request   | Install → Quality → Target Check → Regression (smoke is a subset, not re-run) |
+| `main`         | Install → Quality → Target Check → Manual Deployment Authorization            |
+
+Merging into `main` requires a Pull Request whose Jenkins check
+(`continuous-integration/jenkins/pr-head`, the PR Regression build) has succeeded on a branch
+that is up to date with `main`; GitHub blocks the merge while it is pending or failing.
 
 **Target Check** ([`ci/target-check.mts`](ci/target-check.mts)) runs before any test. It sends
 one read-only `GET` (10-second timeout, no retries, no credentials) to each configured origin:
@@ -204,14 +210,14 @@ correctly, and the target can still fail later in the run. The script's default 
 [`config/environment.ts`](config/environment.ts), because Node cannot load that file directly;
 keep the two in sync. The check is not part of the simulated release flow.
 
-After a passing Main Sanity, a human chooses **APPROVE** or **REJECT** (24-hour timeout).
+After a passing Target Check, a human chooses **APPROVE** or **REJECT** (24-hour timeout).
 No executor or container is held while waiting.
 
 - **APPROVE:** Prepare Release (a `git archive` of the built commit) → Release Manifest →
   Simulated SIT Deployment → SIT Smoke (runs once, against the public ServeRest target) →
   Simulated UAT Promotion (evidence only, no second test run) → Release Evidence.
 - **REJECT:** no SIT/UAT steps. Release Evidence records `releaseValidated=false`, and the
-  build result is still SUCCESS, because the tests passed.
+  build result is still SUCCESS, because nothing failed.
 - **Timeout or external abort:** Jenkins' native interruption, and the build is ABORTED.
   It is never treated as a rejection, and no release evidence is written.
 
@@ -220,7 +226,7 @@ exists, nothing is deployed, and every evidence file says `deploymentMode: simul
 `realDeploymentPerformed: false`. The release logic lives in
 [`ci/release.mts`](ci/release.mts): TypeScript run directly by Node 24, linted and
 type-checked like the tests. Each record carries the build number and commit, and records
-from any other build are ignored. `releaseValidated` is `true` only when Main Sanity passed,
+from any other build are ignored. `releaseValidated` is `true` only when
 deployment was approved, the simulated SIT deployment belongs to this build and commit,
 SIT Smoke passed and the simulated UAT promotion was recorded.
 

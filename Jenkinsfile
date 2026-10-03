@@ -2,7 +2,7 @@
 //
 //   Feature branch : Install -> Quality -> Target Check -> Smoke
 //   Pull request   : Install -> Quality -> Target Check -> Regression (smoke is a subset, not run separately)
-//   main           : Install -> Quality -> Target Check -> Main Sanity -> Manual Deployment Authorization
+//   main           : Install -> Quality -> Target Check -> Manual Deployment Authorization
 //                    APPROVE -> Prepare Release -> Release Manifest -> Simulated SIT Deployment
 //                               -> SIT Smoke (once) -> Simulated UAT Promotion -> Release Evidence
 //                    REJECT  -> Release Evidence (releaseValidated=false, build SUCCESS)
@@ -81,19 +81,6 @@ pipeline {
             sh 'npm run test:regression'
           }
         }
-
-        // Fail-hard gate: a failure stops the build before any authorization or release stage.
-        stage('Main Sanity') {
-          when {
-            allOf {
-              branch 'main'
-              not { changeRequest() }
-            }
-          }
-          steps {
-            sh 'npm run test:sanity'
-          }
-        }
       }
 
       post {
@@ -121,7 +108,7 @@ pipeline {
           def submitter = null
           timeout(time: 24, unit: 'HOURS') {
             def response = input(
-              message: 'Main Sanity passed. Authorize the SIMULATED release (no real SIT/UAT environment exists)?',
+              message: 'Quality and Target Check passed. Authorize the SIMULATED release (no real SIT/UAT environment exists)?',
               ok: 'Submit',
               parameters: [
                 choice(name: 'DECISION', choices: ['APPROVE', 'REJECT'], description: 'APPROVE continues the simulated release; REJECT records evidence only.')

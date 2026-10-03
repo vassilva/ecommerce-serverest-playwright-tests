@@ -14,7 +14,7 @@ const SERVEREST_ID = /^[A-Za-z0-9]{16}$/;
 test.describe('Users API', { tag: '@api' }, () => {
   test(
     'creates a user that can be retrieved by id',
-    { tag: ['@smoke', '@regression', '@sanity'] },
+    { tag: ['@smoke', '@regression'] },
     async ({ usersApi, cleanup }) => {
       const user = buildUser();
 

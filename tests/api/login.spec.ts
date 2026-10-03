@@ -5,7 +5,7 @@ import { buildUser } from '../../test-data/builders';
 test.describe('Login API', { tag: '@api' }, () => {
   test(
     'logs in a registered user and returns a bearer token',
-    { tag: ['@smoke', '@regression', '@sanity'] },
+    { tag: ['@smoke', '@regression'] },
     async ({ authApi, seed }) => {
       const user = await seed.user();
 
