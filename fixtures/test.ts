@@ -1,5 +1,6 @@
 import { test as base, type APIRequestContext } from '@playwright/test';
 import { AuthClient } from '../api/auth-client';
+import { CartsClient } from '../api/carts-client';
 import { ProductsClient } from '../api/products-client';
 import { UsersClient } from '../api/users-client';
 import { environment } from '../config/environment';
@@ -12,6 +13,7 @@ interface ServeRestFixtures {
   usersApi: UsersClient;
   authApi: AuthClient;
   productsApi: ProductsClient;
+  cartsApi: CartsClient;
   /** Deletes the resources this test registered, after the test body finishes (pass or fail). */
   cleanup: ResourceTracker;
   seed: Seeder;
@@ -32,8 +34,11 @@ export const test = base.extend<ServeRestFixtures>({
   productsApi: async ({ apiRequest }, use) => {
     await use(new ProductsClient(apiRequest));
   },
-  cleanup: async ({ usersApi, productsApi }, use) => {
-    const tracker = new ResourceTracker(usersApi, productsApi);
+  cartsApi: async ({ apiRequest }, use) => {
+    await use(new CartsClient(apiRequest));
+  },
+  cleanup: async ({ usersApi, productsApi, cartsApi }, use) => {
+    const tracker = new ResourceTracker(usersApi, productsApi, cartsApi);
     await use(tracker);
     const failures = await tracker.cleanup();
     if (failures.length > 0) {
@@ -41,8 +46,8 @@ export const test = base.extend<ServeRestFixtures>({
       throw new Error(`Cleanup failed for ${failures.length} resource(s):\n- ${failures.join('\n- ')}`);
     }
   },
-  seed: async ({ usersApi, authApi, productsApi, cleanup }, use) => {
-    await use(new Seeder(usersApi, authApi, productsApi, cleanup));
+  seed: async ({ usersApi, authApi, productsApi, cartsApi, cleanup }, use) => {
+    await use(new Seeder(usersApi, authApi, productsApi, cartsApi, cleanup));
   },
 });
 

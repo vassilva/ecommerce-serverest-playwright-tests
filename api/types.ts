@@ -51,6 +51,32 @@ export interface ProductListResponse {
   produtos: Product[];
 }
 
+export interface CartItem {
+  idProduto: string;
+  quantidade: number;
+}
+
+export interface CartPayload {
+  produtos: CartItem[];
+}
+
+export interface CartLine extends CartItem {
+  precoUnitario: number;
+}
+
+export interface Cart {
+  _id: string;
+  idUsuario: string;
+  produtos: CartLine[];
+  precoTotal: number;
+  quantidadeTotal: number;
+}
+
+export interface CartListResponse {
+  quantidade: number;
+  carrinhos: Cart[];
+}
+
 /** Field-level validation errors, e.g. { email: 'email é obrigatório' }. */
 export type ValidationErrorResponse = Record<string, string>;
 
