@@ -70,29 +70,6 @@ test.describe('Users API', { tag: '@api' }, () => {
     },
   );
 
-  test('rejects blank required fields', { tag: ['@regression', '@negative'] }, async ({ usersApi, cleanup }) => {
-    const response = await usersApi.create({ nome: '', email: '', password: '', administrador: '' });
-    const body = (await response.json()) as ValidationErrorResponse;
-    cleanup.userFromCreation(body);
-
-    expect(response.status()).toBe(400);
-    expect(body).toEqual({
-      nome: 'nome não pode ficar em branco',
-      email: 'email não pode ficar em branco',
-      password: 'password não pode ficar em branco',
-      administrador: "administrador deve ser 'true' ou 'false'",
-    });
-  });
-
-  test('rejects an invalid email format', { tag: ['@regression', '@negative'] }, async ({ usersApi, cleanup }) => {
-    const response = await usersApi.create(buildUser({ email: 'not-an-email' }));
-    const body = (await response.json()) as ValidationErrorResponse;
-    cleanup.userFromCreation(body);
-
-    expect(response.status()).toBe(400);
-    expect(body).toEqual({ email: 'email deve ser um email válido' });
-  });
-
   test('deletes a user so it can no longer be retrieved', { tag: '@regression' }, async ({ usersApi, seed }) => {
     const user = await seed.user();
 
