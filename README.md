@@ -99,11 +99,11 @@ There are no `eslint-disable` comments in the codebase.
 
 ```
 config/environment.ts     Target URLs (env vars + public defaults, validated)
-api/                      Focused API clients (users, auth, products) + response types
+api/                      Focused API clients (users, auth, products, carts) + response types
 fixtures/test.ts          Custom Playwright fixtures: API clients, cleanup, seed
 support/
   resource-tracker.ts     Per-test cleanup of exactly the resources a test created
-  seeder.ts               API setup helpers (user, admin session, product)
+  seeder.ts               API setup helpers (user, admin session, product, cart)
   network.ts              Matches the front-end's calls to the ServeRest API
   redaction.ts            Compares users without printing their (fake) passwords
 ci/target-check.mts       Jenkins Target Check: is the public ServeRest target reachable?
@@ -116,7 +116,7 @@ tests/ui/                 UI specs   -> Playwright project "chromium"
 ```
 
 **API layer.** One small client per resource (`UsersClient`, `AuthClient`,
-`ProductsClient`) wraps a dedicated `APIRequestContext` bound to `SERVEREST_API_URL`.
+`ProductsClient`, `CartsClient`) wraps a dedicated `APIRequestContext` bound to `SERVEREST_API_URL`.
 Clients return raw `APIResponse` objects so tests assert exact status codes and bodies.
 
 **UI layer.** Page Objects expose locators and user actions; assertions stay in the
@@ -153,16 +153,19 @@ reserved for documentation (RFC 2606). Passwords are random fake test values.
 
 ## Cleanup
 
-- Every created user or product is registered with the per-test `ResourceTracker`,
+- Every created user, product or cart is registered with the per-test `ResourceTracker`,
   either through the `seed` fixture or with `cleanup.userFromCreation(body)` /
-  `cleanup.productFromCreation(body, adminToken)`.
+  `cleanup.productFromCreation(body, adminToken)` / `cleanup.cartFromCreation(body, ownerToken)`.
 - Every creation _attempt_ is registered before its status is asserted, including
   attempts that are expected to be rejected. If ServeRest ever accepted one unexpectedly,
   the test fails and the resource is still deleted.
 - Cleanup runs in the `cleanup` fixture teardown, so it runs whether the test passes or fails.
-- Resources are deleted newest-first, which removes products before the admin user whose
-  token deletes them.
-- Every deletion is verified. Failures are collected, and reported as a separate error
+- Resources are deleted newest-first. A cart is cancelled (`DELETE /carrinhos/cancelar-compra`
+  with its owner's token, which also restores stock) before its user and products, because
+  ServeRest refuses to delete either while the cart exists. Products are deleted before the
+  admin user whose token deletes them.
+- Every deletion is verified. A cart cancellation is accepted only as "cancelled, stock
+  restored" or "no cart" (the test already completed or cancelled it). Failures are collected, and reported as a separate error
   **alongside** any test failure, never instead of it.
 - Only ids the test itself created are deleted. There is no bulk or pattern-based deletion.
 

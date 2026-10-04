@@ -1,8 +1,10 @@
 import { expect } from '@playwright/test';
 import type { AuthClient } from '../api/auth-client';
+import type { CartsClient } from '../api/carts-client';
 import type { ProductsClient } from '../api/products-client';
 import type { UsersClient } from '../api/users-client';
 import type {
+  CartItem,
   Credentials,
   CreatedResponse,
   LoginResponse,
@@ -29,6 +31,7 @@ export class Seeder {
     private readonly users: UsersClient,
     private readonly auth: AuthClient,
     private readonly products: ProductsClient,
+    private readonly carts: CartsClient,
     private readonly tracker: ResourceTracker,
   ) {}
 
@@ -59,5 +62,14 @@ export class Seeder {
     this.tracker.productFromCreation(body, adminToken);
     expect(response.status(), 'seed: POST /produtos should return 201').toBe(201);
     return { ...payload, _id: body._id };
+  }
+
+  /** Creates the cart of the token's owner and returns its id; cleanup cancels it, restoring stock. */
+  async cart(token: string, produtos: CartItem[]): Promise<string> {
+    const response = await this.carts.create({ produtos }, token);
+    const body = (await response.json()) as CreatedResponse;
+    this.tracker.cartFromCreation(body, token);
+    expect(response.status(), 'seed: POST /carrinhos should return 201').toBe(201);
+    return body._id;
   }
 }
