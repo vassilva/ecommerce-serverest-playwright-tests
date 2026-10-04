@@ -20,7 +20,7 @@ async function expectNoProductNamed(productsApi: ProductsClient, nome: string): 
 
 test.describe('Products API', { tag: '@api' }, () => {
   test(
-    'allows an administrator to create a product that can be retrieved by id',
+    'allows an administrator to create a product that can be retrieved by id and found by name',
     { tag: ['@smoke', '@regression'] },
     async ({ productsApi, seed, cleanup }) => {
       const { token } = await seed.adminSession();
@@ -32,22 +32,20 @@ test.describe('Products API', { tag: '@api' }, () => {
 
       expect(response.status()).toBe(201);
       expect(body).toEqual({ message: 'Cadastro realizado com sucesso', _id: expect.stringMatching(SERVEREST_ID) });
+      const persisted = { ...product, _id: body._id };
 
       const lookup = await productsApi.getById(body._id);
-      expect(lookup.status()).toBe(200);
-      expect((await lookup.json()) as Product).toEqual({ ...product, _id: body._id });
+      expect(lookup.status(), 'GET by id').toBe(200);
+      expect((await lookup.json()) as Product, 'GET by id').toEqual(persisted);
+
+      const search = await productsApi.searchByName(product.nome);
+      expect(search.status(), 'search by exact name').toBe(200);
+      expect((await search.json()) as ProductListResponse, 'search by exact name').toEqual({
+        quantidade: 1,
+        produtos: [persisted],
+      });
     },
   );
-
-  test('finds a created product by exact name', { tag: '@regression' }, async ({ productsApi, seed }) => {
-    const { token } = await seed.adminSession();
-    const product = await seed.product(token);
-
-    const response = await productsApi.searchByName(product.nome);
-
-    expect(response.status()).toBe(200);
-    expect((await response.json()) as ProductListResponse).toEqual({ quantidade: 1, produtos: [product] });
-  });
 
   test(
     'rejects product creation without a token',

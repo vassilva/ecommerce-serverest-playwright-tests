@@ -20,7 +20,7 @@ async function expectNoCart(cartsApi: CartsClient, id: string): Promise<void> {
 
 test.describe('Carts API', { tag: '@api' }, () => {
   test(
-    'creates a cart that reserves stock and records prices and totals',
+    'reserves stock with correct lines and totals, and cancelling restores it',
     { tag: '@regression' },
     async ({ cartsApi, productsApi, seed, cleanup }) => {
       const { token: adminToken } = await seed.adminSession();
@@ -28,57 +28,61 @@ test.describe('Carts API', { tag: '@api' }, () => {
       const second = await seed.product(adminToken, { quantidade: 5 });
       const shopper = await seed.user();
       const token = await seed.token(shopper);
+      const firstStock = await stockOf(productsApi, first._id);
+      const secondStock = await stockOf(productsApi, second._id);
+      let cartId = '';
 
-      const response = await cartsApi.create(
-        {
+      await test.step('create the cart', async () => {
+        const response = await cartsApi.create(
+          {
+            produtos: [
+              { idProduto: first._id, quantidade: 3 },
+              { idProduto: second._id, quantidade: 1 },
+            ],
+          },
+          token,
+        );
+        const body = (await response.json()) as CreatedResponse;
+        cleanup.cartFromCreation(body, token);
+
+        expect(response.status()).toBe(201);
+        expect(body).toEqual({ message: 'Cadastro realizado com sucesso', _id: expect.stringMatching(SERVEREST_ID) });
+        cartId = body._id;
+      });
+
+      await test.step('the cart is persisted with its lines, prices and totals', async () => {
+        const lookup = await cartsApi.getById(cartId);
+        expect(lookup.status()).toBe(200);
+        expect((await lookup.json()) as Cart).toEqual({
+          _id: cartId,
+          idUsuario: shopper._id,
           produtos: [
-            { idProduto: first._id, quantidade: 3 },
-            { idProduto: second._id, quantidade: 1 },
+            { idProduto: first._id, quantidade: 3, precoUnitario: first.preco },
+            { idProduto: second._id, quantidade: 1, precoUnitario: second.preco },
           ],
-        },
-        token,
-      );
-      const body = (await response.json()) as CreatedResponse;
-      cleanup.cartFromCreation(body, token);
-
-      expect(response.status()).toBe(201);
-      expect(body).toEqual({ message: 'Cadastro realizado com sucesso', _id: expect.stringMatching(SERVEREST_ID) });
-      expect(await stockOf(productsApi, first._id)).toBe(7);
-      expect(await stockOf(productsApi, second._id)).toBe(4);
-
-      const lookup = await cartsApi.getById(body._id);
-      expect(lookup.status()).toBe(200);
-      expect((await lookup.json()) as Cart).toEqual({
-        _id: body._id,
-        idUsuario: shopper._id,
-        produtos: [
-          { idProduto: first._id, quantidade: 3, precoUnitario: first.preco },
-          { idProduto: second._id, quantidade: 1, precoUnitario: second.preco },
-        ],
-        precoTotal: first.preco * 3 + second.preco,
-        quantidadeTotal: 4,
+          precoTotal: first.preco * 3 + second.preco,
+          quantidadeTotal: 4,
+        });
       });
-    },
-  );
 
-  test(
-    'cancels a purchase, restoring stock and removing the cart',
-    { tag: '@regression' },
-    async ({ cartsApi, productsApi, seed }) => {
-      const { token: adminToken } = await seed.adminSession();
-      const product = await seed.product(adminToken, { quantidade: 10 });
-      const token = await seed.token(await seed.user());
-      const cartId = await seed.cart(token, [{ idProduto: product._id, quantidade: 3 }]);
-      expect(await stockOf(productsApi, product._id), 'stock reserved by the cart').toBe(7);
-
-      const response = await cartsApi.cancelPurchase(token);
-
-      expect(response.status()).toBe(200);
-      expect((await response.json()) as MessageResponse).toEqual({
-        message: 'Registro excluído com sucesso. Estoque dos produtos reabastecido',
+      await test.step('stock is reduced by exactly the reserved quantities', async () => {
+        expect(await stockOf(productsApi, first._id)).toBe(firstStock - 3);
+        expect(await stockOf(productsApi, second._id)).toBe(secondStock - 1);
       });
-      expect(await stockOf(productsApi, product._id)).toBe(10);
-      await expectNoCart(cartsApi, cartId);
+
+      await test.step('cancelling restores stock and removes the cart', async () => {
+        const response = await cartsApi.cancelPurchase(token);
+        expect(response.status()).toBe(200);
+        expect((await response.json()) as MessageResponse).toEqual({
+          message: 'Registro excluído com sucesso. Estoque dos produtos reabastecido',
+        });
+
+        expect(await stockOf(productsApi, first._id)).toBe(firstStock);
+        expect(await stockOf(productsApi, second._id)).toBe(secondStock);
+        await expectNoCart(cartsApi, cartId);
+        const carts = await cartsApi.listByUser(shopper._id);
+        expect((await carts.json()) as CartListResponse).toEqual({ quantidade: 0, carrinhos: [] });
+      });
     },
   );
 
@@ -166,46 +170,41 @@ test.describe('Carts API', { tag: '@api' }, () => {
     },
   );
 
-  test('refuses to delete a user who has a cart', { tag: ['@regression', '@negative'] }, async ({ usersApi, seed }) => {
-    const { token: adminToken } = await seed.adminSession();
-    const product = await seed.product(adminToken, { quantidade: 10 });
-    const shopper = await seed.user();
-    const token = await seed.token(shopper);
-    const cartId = await seed.cart(token, [{ idProduto: product._id, quantidade: 1 }]);
-
-    const response = await usersApi.delete(shopper._id);
-
-    expect(response.status()).toBe(400);
-    expect((await response.json()) as MessageResponse).toEqual({
-      message: 'Não é permitido excluir usuário com carrinho cadastrado',
-      idCarrinho: cartId,
-    });
-
-    const lookup = await usersApi.getById(shopper._id);
-    expect(lookup.status()).toBe(200);
-    expect(withoutPassword((await lookup.json()) as User)).toEqual(withoutPassword(shopper));
-  });
-
   test(
-    'refuses to delete a product that is in a cart',
+    'an active cart blocks deleting its user and its product',
     { tag: ['@regression', '@negative'] },
-    async ({ productsApi, seed }) => {
+    async ({ usersApi, productsApi, seed }) => {
       const { token: adminToken } = await seed.adminSession();
       const product = await seed.product(adminToken, { quantidade: 10 });
-      const token = await seed.token(await seed.user());
+      const shopper = await seed.user();
+      const token = await seed.token(shopper);
       const cartId = await seed.cart(token, [{ idProduto: product._id, quantidade: 1 }]);
 
-      const response = await productsApi.delete(product._id, adminToken);
+      await test.step('the user cannot be deleted and still exists', async () => {
+        const response = await usersApi.delete(shopper._id);
+        expect(response.status()).toBe(400);
+        expect((await response.json()) as MessageResponse).toEqual({
+          message: 'Não é permitido excluir usuário com carrinho cadastrado',
+          idCarrinho: cartId,
+        });
 
-      expect(response.status()).toBe(400);
-      expect((await response.json()) as MessageResponse).toEqual({
-        message: 'Não é permitido excluir produto que faz parte de carrinho',
-        idCarrinhos: [cartId],
+        const lookup = await usersApi.getById(shopper._id);
+        expect(lookup.status()).toBe(200);
+        expect(withoutPassword((await lookup.json()) as User)).toEqual(withoutPassword(shopper));
       });
 
-      const lookup = await productsApi.getById(product._id);
-      expect(lookup.status()).toBe(200);
-      expect((await lookup.json()) as Product).toEqual({ ...product, quantidade: 9 });
+      await test.step('the product cannot be deleted and still exists', async () => {
+        const response = await productsApi.delete(product._id, adminToken);
+        expect(response.status()).toBe(400);
+        expect((await response.json()) as MessageResponse).toEqual({
+          message: 'Não é permitido excluir produto que faz parte de carrinho',
+          idCarrinhos: [cartId],
+        });
+
+        const lookup = await productsApi.getById(product._id);
+        expect(lookup.status()).toBe(200);
+        expect((await lookup.json()) as Product).toEqual({ ...product, quantidade: 9 });
+      });
     },
   );
 });

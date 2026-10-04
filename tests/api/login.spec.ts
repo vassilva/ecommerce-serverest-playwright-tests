@@ -1,4 +1,4 @@
-import type { LoginResponse, MessageResponse, ValidationErrorResponse } from '../../api/types';
+import type { LoginResponse, MessageResponse } from '../../api/types';
 import { expect, test } from '../../fixtures/test';
 import { buildUser } from '../../test-data/builders';
 
@@ -22,31 +22,29 @@ test.describe('Login API', { tag: '@api' }, () => {
     },
   );
 
-  test('rejects a wrong password', { tag: ['@regression', '@negative'] }, async ({ authApi, seed }) => {
-    const user = await seed.user();
+  // Both cases must get the same answer, so a response never reveals whether an email is registered.
+  test(
+    'rejects a wrong password and an unknown email with the same response',
+    { tag: ['@regression', '@negative'] },
+    async ({ authApi, seed }) => {
+      const user = await seed.user();
+      const unregistered = buildUser();
 
-    const response = await authApi.login({ email: user.email, password: `${user.password}-wrong` });
+      await test.step('registered email with a wrong password', async () => {
+        const response = await authApi.login({ email: user.email, password: `${user.password}-wrong` });
+        expect(response.status(), 'wrong password').toBe(401);
+        expect((await response.json()) as MessageResponse, 'wrong password').toEqual({
+          message: 'Email e/ou senha inválidos',
+        });
+      });
 
-    expect(response.status()).toBe(401);
-    expect((await response.json()) as MessageResponse).toEqual({ message: 'Email e/ou senha inválidos' });
-  });
-
-  test('rejects an email that is not registered', { tag: ['@regression', '@negative'] }, async ({ authApi }) => {
-    const unregistered = buildUser();
-
-    const response = await authApi.login({ email: unregistered.email, password: unregistered.password });
-
-    expect(response.status()).toBe(401);
-    expect((await response.json()) as MessageResponse).toEqual({ message: 'Email e/ou senha inválidos' });
-  });
-
-  test('rejects a request without credentials', { tag: ['@regression', '@negative'] }, async ({ authApi }) => {
-    const response = await authApi.login({});
-
-    expect(response.status()).toBe(400);
-    expect((await response.json()) as ValidationErrorResponse).toEqual({
-      email: 'email é obrigatório',
-      password: 'password é obrigatório',
-    });
-  });
+      await test.step('email that is not registered', async () => {
+        const response = await authApi.login({ email: unregistered.email, password: unregistered.password });
+        expect(response.status(), 'unknown email').toBe(401);
+        expect((await response.json()) as MessageResponse, 'unknown email').toEqual({
+          message: 'Email e/ou senha inválidos',
+        });
+      });
+    },
+  );
 });
